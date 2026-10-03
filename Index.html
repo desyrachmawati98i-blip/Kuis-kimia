@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0a0e27" />
+<title>Who Wants to Be a Millionaire — Kimia Edition</title>
+<style>
+  /* ============ RESET & BASE ============ */
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    width: 100%; min-height: 100%;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #05070f; color: #fff; overflow-x: hidden;
+  }
+  body {
+    display: flex; justify-content: center; align-items: flex-start;
+    min-height: 100vh; position: relative;
+  }
+  /* WebGL canvas background */
+  #bg3d {
+    position: fixed; inset: 0; width: 100%; height: 100%;
+    z-index: 0; pointer-events: none;
+  }
+  /* App container */
+  #app {
+    position: relative; z-index: 1;
+    width: 100%; max-width: 520px; min-height: 100vh;
+    padding: 14px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  /* ============ HEADER ============ */
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(10,14,39,.7);
+    border: 1px solid rgba(255,215,0,.35);
+    border-radius: 12px; padding: 8px 12px;
+    backdrop-filter: blur(8px);
+    font-size: 12px;
+  }
+  .topbar .name { font-weight: 700; color: #ffd700; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
+  .topbar .stage { color: #7ee0ff; font-weight: 600; }
+  .topbar .score { color: #8affa0; font-weight: 700; }
+
+  /* ============ SCREENS ============ */
+  .screen { display: none; flex-direction: column; gap: 14px; flex: 1; }
+  .screen.active { display: flex; animation: fadeIn .4s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px);} to { opacity:1; transform: translateY(0);} }
+
+  /* ============ HOME ============ */
+  .home {
+    text-align: center; gap: 18px; padding-top: 20px;
+  }
+  .logo {
+    font-size: 44px; margin-bottom: 4px;
+    filter: drop-shadow(0 0 14px rgba(255,215,0,.7));
+    animation: floatY 3s ease-in-out infinite;
+  }
+  @keyframes floatY { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-8px);} }
+  .title {
+    font-size: 22px; font-weight: 800; line-height: 1.25;
+    background: linear-gradient(135deg,#ffd700,#ffb300,#ffe98a);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 20px rgba(255,215,0,.25);
+  }
+  .subtitle { font-size: 12px; color: #9fb0d0; letter-spacing: .5px; }
+  .card {
+    background: rgba(15,20,45,.85);
+    border: 1px solid rgba(255,215,0,.25);
+    border-radius: 16px; padding: 16px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 6px 24px rgba(0,0,0,.5);
+  }
+  label.inp { display: block; text-align: left; font-size: 12px; color: #9fb0d0; margin-bottom: 6px; font-weight: 600; letter-spacing: .3px;}
+  input[type="text"] {
+    width: 100%; padding: 12px 14px; font-size: 15px;
+    border-radius: 10px; border: 1.5px solid rgba(126,224,255,.35);
+    background: rgba(0,0,0,.35); color: #fff; outline: none;
+    transition: border-color .2s;
+  }
+  input[type="text"]:focus { border-color: #ffd700; box-shadow: 0 0 0 3px rgba(255,215,0,.15); }
+
+  .btn {
+    display: inline-flex; justify-content: center; align-items: center; gap: 8px;
+    width: 100%; min-height: 48px; padding: 12px 16px;
+    border-radius: 12px; border: none; cursor: pointer;
+    font-size: 15px; font-weight: 700; letter-spacing: .3px;
+    transition: transform .12s ease, box-shadow .2s ease, filter .2s;
+    color: #0a0e27;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn-primary {
+    background: linear-gradient(135deg,#ffd700,#ffa700);
+    box-shadow: 0 6px 20px rgba(255,180,0,.4);
+  }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-secondary {
+    background: rgba(126,224,255,.15);
+    color: #7ee0ff; border: 1.5px solid rgba(126,224,255,.5);
+  }
+  .btn-danger {
+    background: rgba(255,90,90,.12);
+    color: #ff8080; border: 1.5px solid rgba(255,90,90,.5);
+  }
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .rules { text-align: left; font-size: 12px; color: #b8c4dd; line-height: 1.7; }
+  .rules b { color: #ffd700; }
+  .rules li { margin-left: 18px; }
+
+  /* ============ GAME ============ */
+  .timer-bar {
+    height: 8px; width: 100%; background: rgba(255,255,255,.1);
+    border-radius: 6px; overflow: hidden; position: relative;
+  }
+  .timer-fill {
+    height: 100%; width: 100%;
+    background: linear-gradient(90deg,#00e676,#ffd700,#ff5252);
+    transition: width 1s linear;
+  }
+  .timer-text { font-size: 11px; color: #9fb0d0; text-align: right; margin-top: 4px; font-weight: 600;}
+
+  .stage-pill {
+    display: inline-block; padding: 4px 12px; border-radius: 999px;
+    font-size: 11px; font-weight: 700; letter-spacing: .5px;
+    background: rgba(126,224,255,.2); color: #7ee0ff;
+    border: 1px solid rgba(126,224,255,.5);
+  }
+
+  .question-box {
+    background: rgba(15,20,45,.9);
+    border: 1.5px solid rgba(255,215,0,.4);
+    border-radius: 14px; padding: 18px 16px;
+    font-size: 15px; line-height: 1.5; font-weight: 600;
+    min-height: 90px; display: flex; align-items: center; justify-content: center;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,.5);
+    animation: qIn .35s ease;
+  }
+  @keyframes qIn { from{opacity:0; transform: translateY(-6px) scale(.98);} to{opacity:1; transform: translateY(0) scale(1);} }
+
+  .answers { display: grid; gap: 8px; }
+  .ans {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; min-height: 52px;
+    background: rgba(20,28,55,.9);
+    border: 1.5px solid rgba(126,224,255,.3);
+    border-radius: 12px; cursor: pointer;
+    font-size: 14px; font-weight: 600; text-align: left;
+    color: #e8eeff; transition: all .18s ease;
+    position: relative;
+  }
+  .ans:hover:not(.disabled):not(.locked) { border-color: #ffd700; transform: translateX(3px); background: rgba(30,40,80,.95);}
+  .ans .letter {
+    width: 30px; height: 30px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg,#ffd700,#ffa700);
+    color: #0a0e27; border-radius: 50%;
+    font-weight: 900; font-size: 14px;
+  }
+  .ans .txt { flex: 1; line-height: 1.35;}
+  .ans.disabled { opacity: .25; pointer-events: none; text-decoration: line-through; }
+  .ans.locked { pointer-events: none; }
+  .ans.correct { background: linear-gradient(135deg,#00c853,#00e676); border-color:#00e676; color:#001a08; animation: pulseG .5s;}
+  .ans.correct .letter { background:#0a0e27; color:#00e676;}
+  .ans.wrong { background: linear-gradient(135deg,#c62828,#ff5252); border-color:#ff5252; animation: shake .4s;}
+  .ans.wrong .letter { background:#0a0e27; color:#ff5252;}
+  @keyframes pulseG { 0%{transform:scale(1);} 50%{transform:scale(1.03);} 100%{transform:scale(1);} }
+  @keyframes shake { 0%,100%{transform:translateX(0);} 25%{transform:translateX(-6px);} 75%{transform:translateX(6px);} }
+
+  .lifelines {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    margin-top: 4px;
+  }
+  .ll {
+    background: rgba(15,20,45,.9);
+    border: 1.5px solid rgba(255,215,0,.4);
+    border-radius: 12px; padding: 10px 6px; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    color: #ffd700; font-weight: 700; font-size: 11px; text-align: center;
+    transition: all .15s ease;
+  }
+  .ll:active { transform: scale(.95);}
+  .ll .icon { font-size: 20px; }
+  .ll.used { opacity: .35; pointer-events: none; filter: grayscale(1); }
+  .ll:hover:not(.used) { background: rgba(255,215,0,.15); }
+
+  /* ============ RESULT ============ */
+  .result-title { font-size: 26px; font-weight: 900; text-align: center; }
+  .result-score {
+    font-size: 44px; font-weight: 900; text-align: center;
+    background: linear-gradient(135deg,#ffd700,#ffb300);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 14px rgba(255,215,0,.5));
+  }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;}
+  .stat { background: rgba(0,0,0,.3); border-radius: 10px; padding: 10px 6px; }
+  .stat .v { font-size: 20px; font-weight: 800; color: #ffd700; }
+  .stat .l { font-size: 10px; color: #9fb0d0; text-transform: uppercase; letter-spacing: .5px; }
+
+  .history { max-height: 220px; overflow-y: auto; }
+  .history-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 10px; border-radius: 8px; margin-bottom: 6px;
+    background: rgba(0,0,0,.3); font-size: 12px;
+    border-left: 3px solid #666;
+  }
+  .history-item.ok { border-left-color: #00e676; }
+  .history-item.no { border-left-color: #ff5252; }
+  .history-item .qn { color: #9fb0d0; font-weight: 700; }
+  .history-item .ja { color: #e8eeff; }
+
+  /* ============ MODAL ============ */
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(0,0,0,.75);
+    backdrop-filter: blur(4px); z-index: 100;
+    display: none; justify-content: center; align-items: center; padding: 16px;
+  }
+  .modal-bg.show { display: flex; animation: fadeIn .25s;}
+  .modal {
+    background: linear-gradient(160deg,#141b3c,#0a0e27);
+    border: 2px solid #ffd700; border-radius: 16px;
+    padding: 20px; max-width: 460px; width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(255,215,0,.25);
+  }
+  .modal .mt { font-size: 18px; font-weight: 800; color: #ffd700; margin-bottom: 8px;}
+  .modal .mc { font-size: 14px; color: #d8e0f5; line-height: 1.55; margin-bottom: 14px; }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: rgba(0,200,83,.95); color: #fff;
+    padding: 12px 20px; border-radius: 12px;
+    font-size: 13px; font-weight: 700; z-index: 200;
+    transition: transform .3s ease; box-shadow: 0 6px 24px rgba(0,0,0,.5);
+    pointer-events: none; white-space: nowrap;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast.err { background: rgba(255,82,82,.95); }
+</style>
+</head>
+<body>
+
+<canvas id="bg3d"></canvas>
+
+<div id="app">
+
+  <!-- ============ HOME SCREEN ============ -->
+  <section id="screen-home" class="screen home active">
+    <div>
+      <div class="logo">⚗️</div>
+      <h1 class="title">Who Wants to Be<br/>a Millionaire</h1>
+      <p class="subtitle">🧪 KIMIA EDITION — Kelas X, XI, XII</p>
+    </div>
+
+    <div class="card">
+      <label class="inp">Nama Siswa</label>
+      <input id="inpNama" type="text" placeholder="Masukkan nama kamu..." maxlength="30" autocomplete="off" />
+    </div>
+
+    <button id="btnMulai" class="btn btn-primary">🚀 MULAI PERMAINAN</button>
+
+    <div class="btn-row">
+      <button id="btnDownload" class="btn btn-secondary">⬇️ Unduh Data</button>
+      <button id="btnReset" class="btn btn-danger">🗑️ Reset Data</button>
+    </div>
+
+    <div class="card">
+      <p class="rules">
+        <b>📋 Cara Bermain:</b>
+        <ul>
+          <li><b>15 soal</b> kimia dari kelas X, XI & XII</li>
+          <li>3 stage: <b>Pemanasan → Menengah → Juara</b></li>
+          <li>Nilai naik: 100 → 1.000.000 poin 💰</li>
+          <li>Titik aman di soal <b>ke-5</b> & <b>ke-10</b></li>
+          <li>3 bantuan: <b>50:50, Tanya Guru, Tanya Teman</b></li>
+          <li>Waktu <b>30 detik</b> per soal ⏱️</li>
+        </ul>
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ GAME SCREEN ============ -->
+  <section id="screen-game" class="screen">
+    <div class="topbar">
+      <span class="name" id="hudNama">Pemain</span>
+      <span class="stage" id="hudStage">Stage 1</span>
+      <span class="score" id="hudSkor">0</span>
+    </div>
+
+    <div>
+      <div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div>
+      <div class="timer-text" id="timerText">⏱ 30s — Soal 1/15</div>
+    </div>
+
+    <div style="text-align:center;">
+      <span class="stage-pill" id="pillStage">STAGE 1 — PEMANASAN</span>
+    </div>
+
+    <div class="question-box" id="questionBox">Memuat soal...</div>
+
+    <div class="answers" id="answers"></div>
+
+    <div class="lifelines">
+      <button class="ll" id="llFifty" title="50:50">
+        <span class="icon">✂️</span><span>50:50</span>
+      </button>
+      <button class="ll" id="llTeacher" title="Tanya Guru">
+        <span class="icon">👩‍🏫</span><span>Tanya Guru</span>
+      </button>
+      <button class="ll" id="llFriend" title="Tanya Teman">
+        <span class="icon">🧑‍🤝‍🧑</span><span>Tanya Teman</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ============ RESULT SCREEN ============ -->
+  <section id="screen-result" class="screen">
+    <div class="card" style="text-align:center;">
+      <div id="resultEmoji" style="font-size:52px;">🏆</div>
+      <div class="result-title" id="resultTitle">Selamat!</div>
+      <div style="font-size:12px;color:#9fb0d0;margin:6px 0;" id="resultSub">Kamu menyelesaikan permainan</div>
+      <div class="result-score" id="resultScore">0</div>
+      <div style="font-size:11px;color:#9fb0d0;margin-top:-4px;">TOTAL SKOR</div>
+    </div>
+
+    <div class="card">
+      <div class="stat-grid">
+        <div class="stat"><div class="v" id="statBenar">0</div><div class="l">Benar</div></div>
+        <div class="stat"><div class="v" id="statSalah">0</div><div class="l">Salah</div></div>
+        <div class="stat"><div class="v" id="statStage">1</div><div class="l">Stage</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:13px;font-weight:700;color:#ffd700;margin-bottom:8px;">📜 Riwayat Jawaban</div>
+      <div class="history" id="history"></div>
+    </div>
+
+    <button id="btnMainLagi" class="btn btn-primary">🔁 Main Lagi</button>
+    <button id="btnDownload2" class="btn btn-secondary">⬇️ Unduh Hasil JSON</button>
+  </section>
+
+</div>
+
+<!-- ============ MODAL ============ -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <div class="mt" id="modalTitle">Info</div>
+    <div class="mc" id="modalContent"></div>
+    <button class="btn btn-primary" id="modalBtn">OK</button>
+  </div>
+</div>
+
+<!-- ============ TOAST ============ -->
+<div id="toast"></div>
+
+<!-- ============ THREE.JS CDN ============ -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+<script>
+/* =========================================================================
+   WHO WANTS TO BE A MILLIONAIRE — KIMIA EDITION
+   Guru: Desy Rachmawati | Kelas XII
+   Single-file HTML + CSS + JS + Three.js (WebGL) + localStorage
+   ========================================================================= */
+
+/* ============ 1. BANK SOAL (15 SOAL) ============
+   EDIT DI SINI untuk mengganti/menambah soal.
+   - kelas : "X" | "XI" | "XII"
+   - stage : 1 | 2 | 3
+   - benar : index huruf benar ("A" | "B" | "C" | "D")
+   - hint  : petunjuk konsep (untuk bantuan Tanya Guru)
+=================================================== */
+const SOAL = [
+  /* ---------- STAGE 1: KELAS X (soal 1-5) ---------- */
+  {
+    kelas:"X", stage:1,
+    soal:"Partikel penyusun atom yang bermuatan negatif dan mengelilingi inti atom adalah...",
+    opsi:["Proton","Neutron","Elektron","Nukleon"],
+    benar:"C",
+    hint:"Ingat model atom Rutherford: inti bermuatan positif, dan ada partikel ringan bermuatan negatif yang mengorbit.",
+    nilai:100
+  },
+  {
+    kelas:"X", stage:1,
+    soal:"Ikatan yang terbentuk akibat serah-terima elektron dari logam ke nonlogam disebut ikatan...",
+    opsi:["Kovalen","Ion","Logam","Hidrogen"],
+    benar:"B",
+    hint:"Ciri khasnya: ada kation (+) dan anion (–) yang tarik-menarik elektrostatik.",
+    nilai:200
+  },
+  {
+    kelas:"X", stage:1,
+    soal:"Jumlah mol dari 11 gram CO₂ (Mr = 44) adalah...",
+    opsi:["0,125 mol","0,25 mol","0,5 mol","1 mol"],
+    benar:"B",
+    hint:"Gunakan rumus: mol = massa ÷ Mr.",
+    nilai:300
+  },
+  {
+    kelas:"X", stage:1,
+    soal:"Larutan yang dapat menghantarkan listrik karena mengandung ion bebas disebut...",
+    opsi:["Larutan nonelektrolit","Larutan elektrolit","Larutan jenuh","Larutan pekat"],
+    benar:"B",
+    hint:"Contohnya garam dapur (NaCl) yang terurai menjadi Na⁺ dan Cl⁻ dalam air.",
+    nilai:500
+  },
+  {
+    kelas:"X", stage:1,
+    soal:"Bilangan oksidasi atom S dalam senyawa H₂SO₄ adalah...",
+    opsi:["+2","+4","+6","–2"],
+    benar:"C",
+    hint:"H = +1 (×2), O = –2 (×4). Total muatan = 0. Selesaikan untuk S.",
+    nilai:1000
+  },
+
+  /* ---------- STAGE 2: KELAS XI (soal 6-10) ---------- */
+  {
+    kelas:"XI", stage:2,
+    soal:"Reaksi yang MELEPASKAN kalor ke lingkungan disebut reaksi...",
+    opsi:["Endoterm","Eksoterm","Reversibel","Katalitik"],
+    benar:"B",
+    hint:"Awalnya 'ekso' = keluar. ΔH negatif.",
+    nilai:2000
+  },
+  {
+    kelas:"XI", stage:2,
+    soal:"Faktor yang TIDAK mempengaruhi laju reaksi adalah...",
+    opsi:["Suhu","Konsentrasi","Katalis","Warna zat"],
+    benar:"D",
+    hint:"Warna tidak mengubah frekuensi tumbukan efektif antar partikel.",
+    nilai:5000
+  },
+  {
+    kelas:"XI", stage:2,
+    soal:"Jika Kc > 1 pada kesetimbangan, maka reaksi cenderung...",
+    opsi:["Ke arah reaktan","Ke arah produk","Berhenti","Tidak dapat ditentukan"],
+    benar:"B",
+    hint:"Kc besar = produk lebih dominan saat setimbang.",
+    nilai:10000
+  },
+  {
+    kelas:"XI", stage:2,
+    soal:"Larutan dengan pH = 3 memiliki konsentrasi H⁺ sebesar...",
+    opsi:["1 × 10⁻³ M","3 × 10⁻³ M","1 × 10³ M","3 × 10³ M"],
+    benar:"A",
+    hint:"pH = –log[H⁺]. Jika pH = 3, maka [H⁺] = 10⁻³ M.",
+    nilai:20000
+  },
+  {
+    kelas:"XI", stage:2,
+    soal:"Campuran CH₃COOH dan CH₃COONa merupakan contoh larutan...",
+    opsi:["Asam kuat","Basa kuat","Penyangga (buffer)","Garam netral"],
+    benar:"C",
+    hint:"Asam lemah + basa konjugasinya = penyangga.",
+    nilai:50000
+  },
+
+  /* ---------- STAGE 3: KELAS XII (soal 11-15) ---------- */
+  {
+    kelas:"XII", stage:3,
+    soal:"Pada sel volta, reaksi oksidasi terjadi di elektrode...",
+    opsi:["Katode","Anode","Jembatan garam","Voltmeter"],
+    benar:"B",
+    hint:"Singkatan: AnOks (Anode = Oksidasi), KatRed (Katode = Reduksi).",
+    nilai:100000
+  },
+  {
+    kelas:"XII", stage:3,
+    soal:"Larutan yang memiliki titik didih paling tinggi adalah...",
+    opsi:["NaCl 0,1 M","Glukosa 0,1 M","Urea 0,1 M","NaCl 0,05 M"],
+    benar:"A",
+    hint:"Sifat koligatif: ΔTb bergantung jumlah partikel. NaCl terionisasi jadi 2 ion (i = 2).",
+    nilai:250000
+  },
+  {
+    kelas:"XII", stage:3,
+    soal:"Sistem dispersi dengan fase terdispersi padat dalam medium cair disebut...",
+    opsi:["Aerosol","Sol","Emulsi","Busa"],
+    benar:"B",
+    hint:"Contoh: cat, tinta, dan agar-agar. Ukuran partikel 1–100 nm.",
+    nilai:500000
+  },
+  {
+    kelas:"XII", stage:3,
+    soal:"Unsur golongan alkali tanah yang paling reaktif adalah...",
+    opsi:["Mg","Ca","Sr","Ba"],
+    benar:"D",
+    hint:"Dalam satu golongan, dari atas ke bawah jari-jari atom membesar → energi ionisasi menurun → makin reaktif.",
+    nilai:750000
+  },
+  {
+    kelas:"XII", stage:3,
+    soal:"Polimer yang terbentuk dari monomer asam amino melalui ikatan peptida adalah...",
+    opsi:["Karbohidrat","Protein","Lipid","Asam nukleat"],
+    benar:"B",
+    hint:"Monomer asam amino → ikatan peptida (–CO–NH–) → polipeptida/protein.",
+    nilai:1000000
+  }
+];
+
+/* ============ 2. KONFIGURASI STAGE ============ */
+const STAGE_INFO = {
+  1: { nama:"PEMANASAN", warna:0x1e88e5, warnaHex:"#1e88e5", css:"stage1" },
+  2: { nama:"MENENGAH",  warna:0x7c3aed, warnaHex:"#7c3aed", css:"stage2" },
+  3: { nama:"JUARA",     warna:0xffb300, warnaHex:"#ffb300", css:"stage3" }
+};
+const SAFE_ZONES = [5, 10]; // titik aman (nomor soal)
+const TOTAL_WAKTU = 30; // detik per soal
+
+/* ============ 3. STATE PERMAINAN ============ */
+let state = {
+  nama: "",
+  soalIndex: 0,
+  skor: 0,
+  skorAman: 0,
+  benar: 0,
+  salah: 0,
+  stage: 1,
+  bantuan: { fifty:false, teacher:false, friend:false },
+  detail: [],
+  locked: false,
+  timer: null,
+  waktuSisa: TOTAL_WAKTU
+};
+
+/* ============ 4. THREE.JS BACKGROUND ============ */
+let scene, camera, renderer, particles, currentColor = STAGE_INFO[1].warna;
+function initThree() {
+  const canvas = document.getElementById("bg3d");
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.z = 30;
+
+  renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  // Partikel berbentuk titik (atom/molekul)
+  const geo = new THREE.BufferGeometry();
+  const count = 180;
+  const positions = new Float32Array(count * 3);
+  const sizes = new Float32Array(count);
+  for (let i = 0; i < count; i++) {
+    positions[i*3]   = (Math.random() - 0.5) * 80;
+    positions[i*3+1] = (Math.random() - 0.5) * 80;
+    positions[i*3+2] = (Math.random() - 0.5) * 40;
+    sizes[i] = Math.random() * 1.5 + 0.4;
+  }
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute("size", new THREE.BufferAttribute(sizes, 1));
+
+  // Custom shader material sederhana
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: new THREE.Color(currentColor) }, uTime: { value: 0 } },
+    vertexShader: `
+      attribute float size;
+      uniform float uTime;
+      varying float vAlpha;
+      void main(){
+        vec3 p = position;
+        p.x += sin(uTime*0.4 + position.y*0.1) * 1.5;
+        p.y += cos(uTime*0.3 + position.x*0.1) * 1.5;
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        gl_PointSize = size * (200.0 / -mv.z);
+        gl_Position = projectionMatrix * mv;
+        vAlpha = 0.4 + 0.6 * (sin(uTime + position.x)*0.5 + 0.5);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColor;
+      varying float vAlpha;
+      void main(){
+        vec2 c = gl_PointCoord - 0.5;
+        float d = length(c);
+        if (d > 0.5) discard;
+        float a = smoothstep(0.5, 0.1, d) * vAlpha;
+        gl_FragColor = vec4(uColor, a);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+
+  particles = new THREE.Points(geo, mat);
+  scene.add(particles);
+
+  animateThree();
+}
+function animateThree() {
+  requestAnimationFrame(animateThree);
+  const t = performance.now() * 0.001;
+  if (particles) {
+    particles.rotation.y = t * 0.05;
+    particles.rotation.x = Math.sin(t * 0.1) * 0.15;
+    particles.material.uniforms.uTime.value = t;
+    // Smooth color transition
+    particles.material.uniforms.uColor.value.lerp(new THREE.Color(currentColor), 0.02);
+  }
+  renderer.render(scene, camera);
+}
+window.addEventListener("resize", () => {
+  if (!renderer) return;
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* ============ 5. WEB AUDIO API (bip) ============ */
+let audioCtx;
+function beep(freq = 660, dur = 0.12, type = "sine", vol = 0.15) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.value = vol;
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + dur);
+  } catch(e){}
+}
+function soundCorrect(){ beep(880,0.12); setTimeout(()=>beep(1320,0.15),100); }
+function soundWrong(){ beep(180,0.3,"sawtooth",0.2); }
+function soundClick(){ beep(560,0.06,"square",0.08); }
+
+/* ============ 6. UI HELPERS ============ */
+const $ = (id) => document.getElementById(id);
+function show(screenId) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  $(screenId).classList.add("active");
+}
+function toast(msg, isErr = false) {
+  const el = $("toast");
+  el.textContent = msg;
+  el.className = isErr ? "show err" : "show";
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className = "", 2200);
+}
+function modal(title, content, onClose) {
+  $("modalTitle").textContent = title;
+  $("modalContent").innerHTML = content;
+  $("modalBg").classList.add("show");
+  $("modalBtn").onclick = () => {
+    $("modalBg").classList.remove("show");
+    if (onClose) onClose();
+  };
+}
+function formatRupiah(n) {
+  return n.toLocaleString("id-ID");
+}
+
+/* ============ 7. LOCALSTORAGE ============ */
+const STORAGE_KEY = "wwtbam_kimia_data";
+function loadStore() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || { siswa:{}, riwayat:[] }; }
+  catch { return { siswa:{}, riwayat:[] }; }
+}
+function saveStore(data) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e){ console.warn(e); }
+}
+function simpanHasilAkhir() {
+  const data = loadStore();
+  data.siswa = { nama: state.nama, terakhirMain: new Date().toISOString() };
+  data.riwayat.push({
+    tanggal: new Date().toISOString(),
+    nama: state.nama,
+    skorAkhir: state.skor,
+    stageTercapai: state.stage,
+    jumlahBenar: state.benar,
+    jumlahSalah: state.salah,
+    bantuanDipakai: Object.keys(state.bantuan).filter(k => state.bantuan[k]),
+    detailJawaban: state.detail
+  });
+  saveStore(data);
+}
+function unduhJSON() {
+  const data = loadStore();
+  if (!data.riwayat || data.riwayat.length === 0) {
+    toast("Belum ada data untuk diunduh", true);
+    return;
+  }
+  const tgl = new Date().toISOString().slice(0,10);
+  const nm = (state.nama || data.siswa.nama || "siswa").replace(/\s+/g,"_");
+  const filename = `hasil-kuis-kimia-${nm}-${tgl}.json`;
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type:"application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast("✅ Data berhasil diunduh!");
+}
+function resetData() {
+  modal("Reset Data", "Yakin ingin menghapus semua data hasil kuis dari perangkat ini?", () => {
+    localStorage.removeItem(STORAGE_KEY);
+    toast("Data berhasil dihapus");
+  });
+}
+
+/* ============ 8. GAME FLOW ============ */
+function mulaiPermainan() {
+  const nama = $("inpNama").value.trim();
+  if (!nama) { toast("Isi nama dulu ya 😊", true); $("inpNama").focus(); return; }
+
+  state = {
+    nama,
+    soalIndex: 0,
+    skor: 0,
+    skorAman: 0,
+    benar: 0,
+    salah: 0,
+    stage: 1,
+    bantuan: { fifty:false, teacher:false, friend:false },
+    detail: [],
+    locked: false,
+    timer: null,
+    waktuSisa: TOTAL_WAKTU
+  };
+  $("hudNama").textContent = nama;
+  $("hudSkor").textContent = "0";
+  $("hudStage").textContent = "Stage 1";
+
+  // Reset tombol bantuan
+  ["llFifty","llTeacher","llFriend"].forEach(id => $(id).classList.remove("used"));
+
+  currentColor = STAGE_INFO[1].warna;
+  show("screen-game");
+  tampilkanSoal();
+}
+
+function tampilkanSoal() {
+  const q = SOAL[state.soalIndex];
+  if (!q) { akhirPermainan(); return; }
+
+  // Update stage kalau berubah
+  state.stage = q.stage;
+  const info = STAGE_INFO[state.stage];
+  currentColor = info.warna;
+  $("hudStage").textContent = "Stage " + state.stage;
+  $("pillStage").textContent = `STAGE ${state.stage} — ${info.nama}`;
+  $("pillStage").style.background = hexA(info.warnaHex, .18);
+  $("pillStage").style.color = info.warnaHex;
+  $("pillStage").style.borderColor = hexA(info.warnaHex, .6);
+
+  $("hudSkor").textContent = formatRupiah(state.skor);
+  $("questionBox").textContent = q.soal;
+  $("questionBox").style.animation = "none";
+  void $("questionBox").offsetWidth;
+  $("questionBox").style.animation = "qIn .35s ease";
+
+  // Tombol jawaban
+  const letters = ["A","B","C","D"];
+  const ansBox = $("answers");
+  ansBox.innerHTML = "";
+  q.opsi.forEach((op, i) => {
+    const btn = document.createElement("button");
+    btn.className = "ans";
+    btn.dataset.letter = letters[i];
+    btn.innerHTML = `<span class="letter">${letters[i]}</span><span class="txt">${op}</span>`;
+    btn.onclick = () => jawab(letters[i], btn);
+    ansBox.appendChild(btn);
+  });
+
+  // Timer
+  state.locked = false;
+  state.waktuSisa = TOTAL_WAKTU;
+  updateTimerUI();
+  clearInterval(state.timer);
+  state.timer = setInterval(() => {
+    state.waktuSisa--;
+    updateTimerUI();
+    if (state.waktuSisa <= 0) {
+      clearInterval(state.timer);
+      jawab(null, null); // habis waktu
+    }
+  }, 1000);
+}
+
+function updateTimerUI() {
+  const pct = (state.waktuSisa / TOTAL_WAKTU) * 100;
+  $("timerFill").style.width = pct + "%";
+  $("timerText").textContent = `⏱ ${state.waktuSisa}s — Soal ${state.soalIndex+1}/15`;
+}
+
+function jawab(letter, btn) {
+  if (state.locked) return;
+  state.locked = true;
+  clearInterval(state.timer);
+  const q = SOAL[state.soalIndex];
+  const benar = q.benar;
+  const isBenar = letter === benar;
+  const waktuPakai = TOTAL_WAKTU - state.waktuSisa;
+
+  // Disable semua tombol
+  document.querySelectorAll(".ans").forEach(b => {
+    b.classList.add("locked");
+    if (b.dataset.letter === benar) {
+      setTimeout(() => b.classList.add("correct"), 100);
+    }
+  });
+  if (btn && !isBenar) btn.classList.add("wrong");
+
+  if (isBenar) {
+    soundCorrect();
+    state.skor += q.nilai;
+    state.benar++;
+    state.detail.push({ noSoal: state.soalIndex+1, kelas: q.kelas, jawaban: letter || "–", benar: true, waktuDetik: waktuPakai, nilai: q.nilai });
+  } else {
+    soundWrong();
+    state.salah++;
+    state.detail.push({ noSoal: state.soalIndex+1, kelas: q.kelas, jawaban: letter || "⏰", benar: false, waktuDetik: waktuPakai, nilai: 0 });
+  }
+
+  // Update safe zone
+  if (SAFE_ZONES.includes(state.soalIndex+1) && isBenar) {
+    state.skorAman = state.skor;
+  }
+
+  $("hudSkor").textContent = formatRupiah(state.skor);
+
+  // Lanjut atau selesai?
+  setTimeout(() => {
+    if (!isBenar) {
+      // Game over — kembali ke safe zone
+      const finalSkor = Math.max(state.skorAman, isBenar ? state.skor : state.skor - q.nilai);
+      state.skor = Math.max(state.skorAman, state.skor - (isBenar ? 0 : q.nilai));
+      // Sebenarnya lebih sederhana: jika salah, skor kembali ke safe zone
+      if (!isBenar) state.skor = state.skorAman;
+
+      modal("❌ Jawaban Salah",
+        `Jawaban yang benar: <b style="color:#00e676">${q.benar}</b><br/><br/>
+         <i>${q.hint}</i><br/><br/>
+         Skor kamu kembali ke titik aman: <b style="color:#ffd700">${formatRupiah(state.skorAman)}</b>`,
+        () => akhirPermainan(true));
+      return;
+    }
+    state.soalIndex++;
+    if (state.soalIndex >= SOAL.length) {
+      akhirPermainan(false);
+    } else {
+      tampilkanSoal();
+    }
+  }, 1400);
+}
+
+function akhirPermainan(gagal = false) {
+  clearInterval(state.timer);
+  simpanHasilAkhir();
+
+  // Emoji & judul
+  let emoji = "🏆", title = "LUAR BIASA!", sub = "Kamu menjawab semua soal!";
+  if (gagal) { emoji = "💪"; title = "COBA LAGI!"; sub = "Kamu berhasil sampai soal " + (state.soalIndex+1); }
+  else if (state.benar === 15) { emoji = "👑"; title = "MILLIONAIRE KIMIA!"; sub = "Sempurna! Kamu jenius kimia!"; }
+  else if (state.benar >= 10) { emoji = "🥇"; title = "HEBAT!"; sub = "Pemahaman kimiamu sangat baik!"; }
+  else if (state.benar >= 6) { emoji = "🥈"; title = "BAGUS!"; sub = "Terus tingkatkan belajarmu!"; }
+  else { emoji = "📚"; title = "AYO BELAJAR LAGI!"; sub = "Jangan menyerah, coba lagi ya!"; }
+
+  $("resultEmoji").textContent = emoji;
+  $("resultTitle").textContent = title;
+  $("resultSub").textContent = sub;
+  $("resultScore").textContent = formatRupiah(state.skor);
+  $("statBenar").textContent = state.benar;
+  $("statSalah").textContent = state.salah;
+  $("statStage").textContent = state.stage;
+
+  // Riwayat
+  const h = $("history");
+  h.innerHTML = "";
+  state.detail.forEach(d => {
+    const div = document.createElement("div");
+    div.className = "history-item " + (d.benar ? "ok" : "no");
+    div.innerHTML = `
+      <span class="qn">Soal ${d.noSoal} (Kelas ${d.kelas})</span>
+      <span class="ja">${d.benar ? "✅" : "❌"} ${d.jawaban} — ${d.waktuDetik}s</span>
+    `;
+    h.appendChild(div);
+  });
+
+  show("screen-result");
+}
+
+/* ============ 9. BANTUAN (LIFELINES) ============ */
+function pakaiFifty() {
+  if (state.bantuan.fifty || state.locked) return;
+  state.bantuan.fifty = true;
+  $("llFifty").classList.add("used");
+  soundClick();
+  const q = SOAL[state.soalIndex];
+  const benar = q.benar;
+  const letters = ["A","B","C","D"];
+  const salah = letters.filter(l => l !== benar);
+  // Acak 2 yang dihapus
+  salah.sort(() => Math.random() - 0.5);
+  const hapus = salah.slice(0, 2);
+  document.querySelectorAll(".ans").forEach(b => {
+    if (hapus.includes(b.dataset.letter)) b.classList.add("disabled");
+  });
+  toast("✂️ 50:50 digunakan!");
+}
+
+function pakaiTeacher() {
+  if (state.bantuan.teacher || state.locked) return;
+  state.bantuan.teacher = true;
+  $("llTeacher").classList.add("used");
+  soundClick();
+  const q = SOAL[state.soalIndex];
+  modal("👩‍🏫 Petunjuk dari Guru", `<i>${q.hint}</i>`);
+}
+
+function pakaiFriend() {
+  if (state.bantuan.friend || state.locked) return;
+  state.bantuan.friend = true;
+  $("llFriend").classList.add("used");
+  soundClick();
+  const q = SOAL[state.soalIndex];
+  const names = ["Andi","Budi","Citra","Dewi","Eka","Fajar"];
+  const namaTeman = names[Math.floor(Math.random()*names.length)];
+  // Probabilitas teman benar: makin sulit, makin rendah
+  const prob = q.stage === 1 ? 0.85 : q.stage === 2 ? 0.7 : 0.55;
+  const pilihBenar = Math.random() < prob;
+  const letters = ["A","B","C","D"];
+  let jawaban;
+  if (pilihBenar) jawaban = q.benar;
+  else {
+    const salah = letters.filter(l => l !== q.benar);
+    jawaban = salah[Math.floor(Math.random()*salah.length)];
+  }
+  const persen = pilihBenar ? Math.floor(70 + Math.random()*25) : Math.floor(35 + Math.random()*25);
+  modal("🧑‍🤝‍🧑 Pendapat Teman",
+    `Menurut <b>${namaTeman}</b>: jawabannya <b style="color:#ffd700">${jawaban}</b><br/>
+     <span style="font-size:12px;color:#9fb0d0">(${persen}% yakin)</span>`);
+}
+
+/* ============ 10. UTIL ============ */
+function hexA(hex, alpha) {
+  const h = hex.replace("#","");
+  const r = parseInt(h.substring(0,2),16);
+  const g = parseInt(h.substring(2,4),16);
+  const b = parseInt(h.substring(4,6),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+/* ============ 11. EVENT BINDING ============ */
+window.addEventListener("DOMContentLoaded", () => {
+  // Init Three.js (kalau tersedia)
+  if (typeof THREE !== "undefined") initThree();
+
+  $("btnMulai").onclick = mulaiPermainan;
+  $("inpNama").addEventListener("keypress", e => { if (e.key === "Enter") mulaiPermainan(); });
+  $("btnDownload").onclick = unduhJSON;
+  $("btnDownload2").onclick = unduhJSON;
+  $("btnReset").onclick = resetData;
+  $("btnMainLagi").onclick = () => { show("screen-home"); };
+
+  $("llFifty").onclick = pakaiFifty;
+  $("llTeacher").onclick = pakaiTeacher;
+  $("llFriend").onclick = pakaiFriend;
+
+  // Isi nama terakhir dari localStorage
+  const data = loadStore();
+  if (data.siswa && data.siswa.nama) $("inpNama").value = data.siswa.nama;
+});
+</script>
+</body>
+</html> 
